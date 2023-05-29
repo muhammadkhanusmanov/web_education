@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 # from .serilezer import LessonSerializer
-from .models import Lesson,Status
+from .models import Lesson,Status,SendTask,Tasks,Rating
 from django.http import FileResponse
 from rest_framework.permissions import IsAdminUser
 from django.contrib.auth.models import User
@@ -31,21 +31,31 @@ class LoginView(APIView):
             token=Token.objects.create(user=user)
             data=[{'token':token.key}]
         try:
-            tasks=Lesson.objects.filter(users=user)
+            tasks=Tasks.objects.all()
             for task in tasks:
+                try:
+                    hwk = SendTask.objects.get(task=task, user=user)
+                    status = 'Topshirdi'
+                    rate = 0.0
+                    try:
+                        rate = Rating.objects.get(user=user,hwk=hwk)
+                        status = 'Baholandi'
+                        rate = rate.rate
+                    except:
+                        status = 'Topshirdi'
+                        rate = 0.0
+                except:
+                    status = 'Berildi'
+                    rate = 0.0
                 url=f'http://eduhemisuz.pythonanywhere.com/home/{task.id}'
-                rate=Status.objects.get(lesson=task)
-                status={
-                    'status':rate.status,
-                    'rating':rate.rating,
-                }
                 data.append({
                     'id':task.id,
                     'name':task.name,
                     'file_name':task.file.name,
                     'file':url,
                     'description':task.description,
-                    'status':status
+                    'status':status,
+                    'rating':rate
                 })
             return Response(data)
         except:
@@ -60,41 +70,104 @@ class SaveFile(APIView):
              # Return the file as a `FileResponse`
          response = FileResponse(file)
          return response
+class SaveWork(APIView):
+    def get(self,request,id):
+        document=SendTask.objects.get(id=id)
+        file = open(document.file.path, 'rb')
+            # Return the file as a `FileResponse`
+        response = FileResponse(file)
+        return response
 
 class AddedTask(APIView):
-    permission_classes = [IsAdminUser]
-    def post(self, requset):
-        users=User.objects.all()
-        data=requset.data
-        task=Lesson.objects.create(
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        user=request.user
+        upload = request.FILES['file']
+        data = request.data
+        task=Tasks.objects.create(
             name=data['name'],
-            file=data.get('file'),
+            file=upload,
             description=data['description'],
-            users=users
+            rating=0.0,
+            status='Berildi'
         )
         task.save()
-        status=Status.objects.create(
-            status="Berildi",
-            rating=0.0,
-            lesson=task
-        )
-        status.save()
         return Response({'response':'OK'})
 
 class CreateUser(APIView):
-    permission_classes = [TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     def post(self, request):
+        user = request.user
+        if user.first_name == 'teacher':
+            try:
+                data = request.data
+                user = User.objects.create(
+                    username = data['username'],
+                    first_name = 'student',
+                    password = make_password(data['password'])
+                )
+                user.save()
+                return Response({'success': 'Done'})
+            except:
+                return Response({'success': 'Error'})
+        else:
+            return Response({'success': 'Ruxsat yo\'q'})
+class SendWork(APIView):
+    authentication_classes = [TokenAuthentication]
+    def get(self,request,id):
+        user=request.user
+        first_name=user.first_name
+        if first_name=='teacher':
+            try:
+                task=Tasks.objects.get()
+                hwks=SendTask.objects.filter(task=task)
+                result=[]
+                for hwk in hwks:
+                    result.append({
+                        'id':hwk.id,
+                        'file_name':hwk.file.name,
+                        'file':f'https://eduhemisuz.pythonanywhere.com/save/{hwk.id}',
+                        'user':hwk.user.username
+                    })
+                return Response(result)
+            except:
+                return Response({'status':'error'})
+
+    def post(self, request):
+        userb = request.user
+        first_name = userb.first_name
+        if first_name == 'student':
+            data=request.data
+            try:
+                upload = request.FILES['file']
+                task = Tasks.objects.get(id=data['id'])
+                hwk=SendTask.objects.create(
+                    file = upload,
+                    task = task,
+                    user = userb.id
+                )
+                hwk.save()
+                return Response({'status':'Done'})
+            except:
+                return Response({'status':'Bad Request'})
+    def put(self,request):
+        data=request.data
         try:
-            data = request.data
-            user = User.objects.create(
-                username = data['username'],
-                first_name = 'student',
-                password = make_password(data['password'])
+            task=SendTask.objects.get(id=data['task_id'])
+            user=User.objects.get(id=task['user_id'])
+            rate=Rating.objects.create(
+                rate=data['rate'],
+                user=user,
+                hwk = task
             )
-            user.save()
-            return Response({'success': 'Done'})
+            task.save()
+            return Response({'status':'Done'})
         except:
-            return Response({'success': 'Error'})
+            return Response({'status':'bad request'})
+
+
+
+
         
     
 
