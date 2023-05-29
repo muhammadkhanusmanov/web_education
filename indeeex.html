@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>File Upload</title>
+</head>
+<body>
+
+  <form id="uploadForm">
+    <input type="text" id="name" placeholder="Name">
+    <input type="text" id="description" placeholder="Description">
+    <input type="file" id="file" accept=".txt,.pdf,.doc,.docx">
+    <button type="submit">Upload</button>
+  </form>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const username = 'Admin';
+      const password = '123';
+      const name = document.getElementById('name').value;
+      const description = document.getElementById('description').value;
+      const file = document.getElementById('file').files[0];
+
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('description', description);
+      formData.append('file', file);
+
+      fetch('https://eduhemisuz.pythonanywhere.com/add_task/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': 'Basic ' + btoa(username + ':' + password),
+        },
+      })
+        .then(response => {
+          if (response.ok) {
+            return response.json(); // Parse response as JSON
+          } else {
+            throw new Error('Error: ' + response.status);
+          }
+        })
+        .then(data => {
+          console.log(data);
+          // Handle the response data
+        })
+        .catch(error => {
+          console.error(error);
+          // Handle any errors
+        });
+    });
+  </script>
+
+</body>
+</html>
