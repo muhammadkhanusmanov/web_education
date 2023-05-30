@@ -1,5 +1,4 @@
 from django.contrib import admin
-from .models import Lesson,Status,SendTask,Rating,Books
-from rest_framework.authtoken.models import Token
+from .models import SendTask,Rating,Tasks,Books
 
-admin.site.register([Lesson,Status,SendTask,Rating,Books])
+admin.site.register([SendTask,Rating,Tasks,Books])
