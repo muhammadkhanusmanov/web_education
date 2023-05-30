@@ -8,10 +8,9 @@ urlpatterns = [
     path('home/<int:id>',SaveFile.as_view()),
     path('add_task/',AddedTask.as_view()),
     path('add_user/',CreateUser.as_view()),
-    path('rated/',SendWork.as_view()),
     path('send_work/',SendWork.as_view()),
     path('save/<int:id>',SaveWork.as_view()),
-    path('getwork/<int:id>',SendWork.as_view),
+    path('getwork/<int:id>',SendWork.as_view()),
     path('save_book/<int:id>',SaveBook.as_view()),
     path('books/',BooksView.as_view()),
 ]
