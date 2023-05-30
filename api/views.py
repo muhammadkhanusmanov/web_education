@@ -5,31 +5,24 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 # from .serilezer import LessonSerializer
-from .models import Lesson,Status,SendTask,Tasks,Rating
+from .models import Lesson,Status,SendTask,Tasks,Rating,Books
 from django.http import FileResponse
 from rest_framework.permissions import IsAdminUser
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 
 
-
-# def doc(request,id, format=None):
-#     document=Lesson.objects.get(id=id)
-#     file = open(document.file.path, 'rb')
-#         # Return the file as a `FileResponse`
-#     response = FileResponse(file)
-#     return response
-
 class LoginView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
         user=request.user
+        name=user.first_name
         try:
             token=Token.objects.get(user=user)
-            data=[{'token':token.key}]
+            data=[{'token':token.key,'type':name}]
         except:
             token=Token.objects.create(user=user)
-            data=[{'token':token.key}]
+            data=[{'token':token.key,'type':name}]
         try:
             tasks=Tasks.objects.all()
             for task in tasks:
@@ -47,7 +40,7 @@ class LoginView(APIView):
                 except:
                     status = 'Berildi'
                     rate = 0.0
-                url=f'http://eduhemisuz.pythonanywhere.com/home/{task.id}'
+                url=f'https://eduhemisuz.pythonanywhere.com/home/{task.id}'
                 data.append({
                     'id':task.id,
                     'name':task.name,
@@ -60,19 +53,28 @@ class LoginView(APIView):
             return Response(data)
         except:
             return Response({"error":'Not Found'})
-    
-    
+
+
 
 class SaveFile(APIView):
-    def get(request,id):
-         document=Lesson.objects.get(id=id)
+    def get(self,request,id):
+         document=Tasks.objects.get(id=id)
          file = open(document.file.path, 'rb')
-             # Return the file as a `FileResponse`
+        # Return the file as a `FileResponse`
          response = FileResponse(file)
+         print(response)
          return response
 class SaveWork(APIView):
+    authentication_classes = [TokenAuthentication]
     def get(self,request,id):
         document=SendTask.objects.get(id=id)
+        file = open(document.file.path, 'rb')
+            # Return the file as a `FileResponse`
+        response = FileResponse(file)
+        return response
+class SaveBook(APIView):
+    def get(self,request,id):
+        document=Books.objects.get(id=id)
         file = open(document.file.path, 'rb')
             # Return the file as a `FileResponse`
         response = FileResponse(file)
@@ -119,20 +121,32 @@ class SendWork(APIView):
         first_name=user.first_name
         if first_name=='teacher':
             try:
-                task=Tasks.objects.get()
+                task=Tasks.objects.get(id=id)
                 hwks=SendTask.objects.filter(task=task)
                 result=[]
                 for hwk in hwks:
-                    result.append({
-                        'id':hwk.id,
-                        'file_name':hwk.file.name,
-                        'file':f'https://eduhemisuz.pythonanywhere.com/save/{hwk.id}',
-                        'user':hwk.user.username
-                    })
+                    try:
+                        rate = Rating.objects.get(hwk=hwk)
+                        rating=rate.rate
+                        result.append({
+                            'id':hwk.id,
+                            'file_name':hwk.file.name,
+                            'file':f'https://eduhemisuz.pythonanywhere.com/save/{hwk.id}',
+                            'user':hwk.user.username,
+                            'rating':rating
+                        })
+                    except:
+                        rate=False
+                        result.append({
+                            'id':hwk.id,
+                            'file_name':hwk.file.name,
+                            'file':f'https://eduhemisuz.pythonanywhere.com/save/{hwk.id}',
+                            'user':hwk.user.username,
+                            'rating':rate
+                        })
                 return Response(result)
             except:
                 return Response({'status':'error'})
-
     def post(self, request):
         userb = request.user
         first_name = userb.first_name
@@ -141,23 +155,23 @@ class SendWork(APIView):
             try:
                 upload = request.FILES['file']
                 task = Tasks.objects.get(id=data['id'])
+                user=User.objects.get(username=data['username'])
                 hwk=SendTask.objects.create(
                     file = upload,
                     task = task,
-                    user = userb.id
+                    user = user
                 )
                 hwk.save()
-                return Response({'status':'Done'})
+                return Response({'status':'Qo\'shildi'})
             except:
                 return Response({'status':'Bad Request'})
     def put(self,request):
         data=request.data
         try:
             task=SendTask.objects.get(id=data['task_id'])
-            user=User.objects.get(id=task['user_id'])
             rate=Rating.objects.create(
                 rate=data['rate'],
-                user=user,
+                user=task.user,
                 hwk = task
             )
             task.save()
@@ -165,9 +179,34 @@ class SendWork(APIView):
         except:
             return Response({'status':'bad request'})
 
+class BooksView(APIView):
+    def get(self,request):
+        try:
+            books=Books.objects.all()
+            data=[{'status':'OK'}]
+            for book in books:
+                data.append({
+                    'id':book.id,
+                    'name':book.name,
+                    'file_name':book.file.name,
+                    'file':f'https://eduhemisuz.pythonanywhere.com/save_book/{book.id}'
+                })
+            return Response(data)
+        except:
+            return ({'status':'error'})
+    def post(self,request):
+        try:
+           upload = request.FILES['file']
+           data = request.data
+           book=Books.objects.create(
+               name = data['name'],
+               file = upload
+           )
+           book.save()
+           return Response({'success': True})
+        except:
+            return Response({'success': False})
 
 
 
-        
-    
 
